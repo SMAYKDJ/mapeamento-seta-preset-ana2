@@ -51,9 +51,9 @@ DEFAULTS = {
     "channel": 0,                 # 0 = canal MIDI 1
     "cc": 48,                     # knob 1 da APC Key 25 (knobs: CC 48..55)
     "mode": "relative",           # APC Key 25 mk2: knobs relativos (1 = direita, 127 = esquerda)
-    "step": 2,                    # cliques do knob para avançar 1 preset (sensibilidade)
+    "step": 6,                    # cliques do knob para avançar 1 preset (maior = menos sensível)
     "interval_ms": 150,           # tempo mínimo entre cliques
-    "max_pending": 8,             # máximo de cliques acumulados na fila
+    "max_pending": 2,             # máximo de cliques acumulados na fila
     "window_match": "ANA 2",      # trecho do título da janela do plugin
     "restore_mouse": True,        # devolve o cursor para onde estava após clicar
     # Posição das setas em pontos, relativa ao canto superior esquerdo da janela
@@ -220,13 +220,16 @@ class Stepper:
 
     def feed(self, value):
         if self.mode == "relative":
-            delta = value if value < 64 else value - 128
+            # só a direção importa (ignora aceleração do encoder)
+            delta = 1 if 0 < value < 64 else (-1 if value > 64 else 0)
         else:
             if self.last is None:
                 self.last = value
                 return 0
             delta = value - self.last
             self.last = value
+        if delta and self.acc and (delta > 0) != (self.acc > 0):
+            self.acc = 0                       # mudou de direção: recomeça a contagem
         self.acc += delta
         steps = int(self.acc / self.step)       # trunca em direção a zero
         self.acc -= steps * self.step
