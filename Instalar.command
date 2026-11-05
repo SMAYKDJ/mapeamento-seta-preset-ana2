@@ -14,7 +14,8 @@ if [ -z "$PY" ]; then
 fi
 
 mkdir -p "$APP" "$HOME/Library/LaunchAgents"
-cp "$SRC/ana_preset_agent.py" "$SRC/interface.html" "$APP/"
+cp "$SRC/ana_preset_agent.py" "$SRC/interface.html" "$SRC/controller3d.js" "$APP/"
+mkdir -p "$APP/vendor" && cp "$SRC/vendor/"* "$APP/vendor/"
 
 if [ ! -x "$APP/venv/bin/python" ]; then
   echo "Criando ambiente Python..."

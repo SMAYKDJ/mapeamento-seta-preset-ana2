@@ -553,6 +553,11 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         if u.path in ("/", "/index.html"):
             return self._send(200, (HERE / "interface.html").read_bytes(), "text/html")
+        static = {"/vendor/three.module.min.js": "vendor/three.module.min.js",
+                  "/vendor/OrbitControls.js": "vendor/OrbitControls.js",
+                  "/controller3d.js": "controller3d.js"}
+        if u.path in static and (HERE / static[u.path]).exists():
+            return self._send(200, (HERE / static[u.path]).read_bytes(), "text/javascript")
         if u.path == "/api/state":
             q = parse_qs(u.query)
             since = int(q["since"][0]) if q.get("since", [""])[0].lstrip("-").isdigit() else None

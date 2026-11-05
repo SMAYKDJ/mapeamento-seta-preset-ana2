@@ -64,6 +64,10 @@
   main { max-width: 900px; }
   /* ---------- controlador */
   .dev-wrap { overflow-x: auto; }
+  .dev3d { border-radius: 12px; overflow: hidden; cursor: grab;
+           background: radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--card) 70%, #8a8f99), var(--card)); }
+  .dev3d:active { cursor: grabbing; }
+  .dev3d canvas { display: block; }
   .dev { min-width: 640px; background: #1d1f24; border-radius: 12px; padding: 16px 16px 12px;
          border-left: 6px solid #c8382c; border-right: 6px solid #c8382c; color: #cfd3da;
          font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
@@ -123,8 +127,9 @@
 
   <section class="card">
     <h2>Seu controlador</h2>
-    <p class="hint">Mexa em qualquer pad, knob, botão ou tecla: ele acende aqui. Controles mapeados aparecem marcados (<span class="tag t-prev">◀</span> <span class="tag t-next">▶</span> <span class="tag t-knob">knob</span>).</p>
-    <div class="dev-wrap"><div class="dev" id="dev">
+    <p class="hint">Mexa em qualquer pad, knob, botão ou tecla: ele acende aqui. Arraste para girar a vista 3D, role para aproximar. Controles mapeados aparecem marcados (<span class="tag t-prev">◀</span> <span class="tag t-next">▶</span> <span class="tag t-knob">knob</span>).</p>
+    <div id="dev3dhost" class="dev3d hidden"></div>
+    <div class="dev-wrap" id="dev2d"><div class="dev" id="dev">
       <div class="dev-top">
         <div class="dev-left">
           <div class="pads" id="pads"></div>
@@ -197,6 +202,8 @@
     <details><summary>Registro</summary><pre id="log"></pre></details>
   </section>
 </main>
+<script type="importmap">{"imports":{"three":"/vendor/three.module.min.js"}}</script>
+<script type="module" src="/controller3d.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 let editing = false;
@@ -270,10 +277,18 @@ function onEvent(e) {
   const name = (e.type === 'cc' ? 'CC ' : 'Nota ') + e.number + ' = ' + e.value + ' · canal ' + (e.channel + 1) + ' · ' + e.port;
   $('devmon').textContent = name;
   const id = ctlId(e), node = id && $(id);
+  if (window.dev3d && id) {
+    if (id.startsWith('c-cc-') && id !== 'k-cc-64') {
+      const d = e.value < 64 ? e.value : e.value - 128;
+      knobAngle[id] = (knobAngle[id] || 0) + d * 6;
+      window.dev3d.knob(id, knobAngle[id]);
+    } else if (id.startsWith('key-') || id.startsWith('k-cc-')) window.dev3d.hit(id, e.value > 0);
+    else if (e.value > 0) window.dev3d.hit(id, true);
+  }
   if (!node) return;
   if (node.classList.contains('knob')) {
     const d = e.value < 64 ? e.value : e.value - 128;   // relativo
-    knobAngle[id] = ((knobAngle[id] || 0) + d * 6) % 360;
+    if (!window.dev3d) knobAngle[id] = (knobAngle[id] || 0) + d * 6;
     node.style.setProperty('--a', knobAngle[id] + 'deg');
     flash(node, 300); return;
   }
@@ -286,6 +301,14 @@ function flash(node, ms) {
   node._t = setTimeout(() => node.classList.remove('hit'), ms);
 }
 function markBindings(b) {
+  if (window.dev3d) {
+    const map = {};
+    for (const slot of ['prev','next','knob']) {
+      const r = b[slot] && b[slot].raw; if (!r) continue;
+      const id = ctlId({ port: r.port, type: r.type, number: r.number }); if (id) map[id] = slot;
+    }
+    window.dev3d.bindings(map);
+  }
   document.querySelectorAll('.b-prev,.b-next,.b-knob').forEach(n => n.classList.remove('b-prev','b-next','b-knob'));
   document.querySelectorAll('.badge').forEach(n => n.remove());
   for (const [slot, cls, sym] of [['prev','b-prev','◀'],['next','b-next','▶'],['knob','b-knob','']]) {

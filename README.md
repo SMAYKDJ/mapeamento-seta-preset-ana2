@@ -41,6 +41,7 @@ Se o seu controlador também comanda o Ableton (Control Surface), escolha um con
 |---|---|
 | `ana_preset_agent.py` | agente em segundo plano + servidor da interface |
 | `interface.html` | interface com instruções |
+| `controller3d.js` + `vendor/` | controlador em 3D (Three.js r160, incluído para funcionar offline) |
 | `Instalar.command` / `Desinstalar.command` | instala/remove com início automático (LaunchAgent) |
 | `ana_knob.py` | versão simples de linha de comando (v1) |
 | `midi_diag.py` | lista portas MIDI e mostra tudo que chega |
