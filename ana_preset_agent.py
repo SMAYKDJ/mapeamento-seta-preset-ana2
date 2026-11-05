@@ -417,11 +417,11 @@ class Engine:
         b = self.cfg.get("bindings")
         if self.match(b.get("prev"), port, t, ch, num):
             if val > 0:
-                self.push(-1, reset=True)
+                self.push(-1, reset=True, source="prev")
             return
         if self.match(b.get("next"), port, t, ch, num):
             if val > 0:
-                self.push(+1, reset=True)
+                self.push(+1, reset=True, source="next")
             return
         k = b.get("knob")
         if self.match(k, port, t, ch, num):
@@ -444,9 +444,14 @@ class Engine:
         steps = int(self.acc / step)
         if steps:
             self.acc -= steps * step
-            self.push(steps)
+            self.push(steps, source="knob")
 
-    def push(self, steps, reset=False):
+    def push(self, steps, reset=False, source=None):
+        # avisa a interface (animação da função executada)
+        self.seq += 1
+        self.events.append({"seq": self.seq, "type": "action", "dir": 1 if steps > 0 else -1,
+                            "count": abs(steps), "source": source or "virtual",
+                            "port": "", "channel": 0, "number": 0, "value": 0})
         cap = int(self.cfg.get("max_pending"))
         with self.lock:
             if reset and self.pending and (steps > 0) != (self.pending > 0):
@@ -596,6 +601,7 @@ class Engine:
             "calib": self.calib,
             "log": LOG[-15:],
             "seq": self.seq,
+            "acc": self.acc,
             "events": [e for e in list(self.events) if since is not None and e["seq"] > since][-60:],
         }
 
@@ -620,9 +626,12 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         if u.path in ("/", "/index.html"):
             return self._send(200, (HERE / "interface.html").read_bytes(), "text/html")
+        if u.path == "/classic" and (HERE / "interface_classic.html").exists():
+            return self._send(200, (HERE / "interface_classic.html").read_bytes(), "text/html")
         static = {"/vendor/three.module.min.js": "vendor/three.module.min.js",
                   "/vendor/OrbitControls.js": "vendor/OrbitControls.js",
-                  "/controller3d.js": "controller3d.js"}
+                  "/controller3d.js": "controller3d.js",
+                  "/controller3d_classic.js": "controller3d_classic.js"}
         if u.path in static and (HERE / static[u.path]).exists():
             return self._send(200, (HERE / static[u.path]).read_bytes(), "text/javascript")
         if u.path == "/api/state":
@@ -657,7 +666,7 @@ class Handler(BaseHTTPRequestHandler):
                 kw["interval_ms"] = max(50, min(1000, int(body["interval_ms"])))
             e.cfg.set(**kw)
         elif p == "/api/test" and body.get("dir") in (-1, 1):
-            e.push(body["dir"], reset=True)
+            e.push(body["dir"], reset=True, source=body.get("source") or "virtual")
         elif p == "/api/calibrate":
             e.calibrate()
         elif p == "/api/permission":

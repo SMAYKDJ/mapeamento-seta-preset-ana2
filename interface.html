@@ -6,367 +6,345 @@
 <title>ANA Preset Knob</title>
 <style>
   :root {
-    --bg: #f4f5f7; --card: #ffffff; --ink: #1b1d22; --muted: #6a6f7a;
-    --line: #e2e4e9; --accent: #e8743b; --ok: #1f9d55; --bad: #d64545; --warn: #c98a00;
-    --chip: #eef0f3;
+    --bg: #e9ebef; --panel: rgba(255,255,255,.86); --ink: #1b1d22; --muted: #646a75;
+    --line: rgba(20,22,27,.10); --chip: rgba(20,22,27,.06); --accent: #e8743b;
+    --ok: #1f9d55; --bad: #d64545; --warn: #c98a00; --prev: #3b82f6; --next: #22c55e;
+    --lw: 340px; --rw: 320px;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #15171b; --card: #1f2228; --ink: #eceef2; --muted: #9aa0ab;
-            --line: #2e323a; --chip: #2a2e35; }
+    :root { --bg: #121418; --panel: rgba(28,31,37,.86); --ink: #eceef2; --muted: #9aa0ab;
+            --line: rgba(255,255,255,.08); --chip: rgba(255,255,255,.06); }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink);
-         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-  main { max-width: 760px; margin: 0 auto; padding: 28px 16px 60px; }
-  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
-  h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; }
-  h1 span { color: var(--accent); }
-  .sub { color: var(--muted); margin: 0 0 22px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
-          padding: 18px 18px 16px; margin-bottom: 14px; }
-  .card h2 { font-size: 15px; margin: 0 0 4px; display: flex; gap: 8px; align-items: center; }
-  .num { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
-         background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; }
-  .hint { color: var(--muted); margin: 0 0 12px; font-size: 14px; }
-  .status { display: flex; flex-wrap: wrap; gap: 8px; }
-  .chip { background: var(--chip); border-radius: 999px; padding: 4px 10px; font-size: 13px;
-          display: inline-flex; align-items: center; gap: 6px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body { background: radial-gradient(ellipse at 50% 35%, color-mix(in srgb, var(--bg) 80%, #9aa0ab), var(--bg));
+         color: var(--ink); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; touch-action: none; }
+
+  /* ---------- sidebars */
+  .side { position: fixed; top: 12px; bottom: 12px; width: var(--lw); z-index: 5;
+          background: var(--panel); backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3);
+          border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,.12);
+          display: flex; flex-direction: column; transition: transform .45s cubic-bezier(.2,.8,.2,1), opacity .3s; }
+  #left { left: 12px; }
+  #right { right: 12px; width: var(--rw); }
+  body.hide-left #left { transform: translateX(calc(-100% - 24px)); opacity: 0; pointer-events: none; }
+  body.hide-right #right { transform: translateX(calc(100% + 24px)); opacity: 0; pointer-events: none; }
+  .side header { display: flex; align-items: center; gap: 8px; padding: 14px 14px 8px 16px; }
+  .side header h1, .side header h2 { margin: 0; font-size: 16px; flex: 1; letter-spacing: -.01em; }
+  .side header h1 span { color: var(--accent); }
+  .side .scroll { overflow: auto; padding: 0 16px 14px; flex: 1; }
+  .icon { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: var(--chip);
+          color: var(--ink); cursor: pointer; display: grid; place-items: center; font-size: 15px; padding: 0; }
+  .icon:hover { border-color: var(--accent); }
+
+  /* ---------- abas para reabrir */
+  .tab { position: fixed; top: 50%; z-index: 4; transform: translateY(-50%); writing-mode: vertical-rl;
+         background: var(--panel); border: 1px solid var(--line); color: var(--ink); cursor: pointer;
+         padding: 14px 8px; font: 600 12px/1 -apple-system, sans-serif; letter-spacing: .06em;
+         backdrop-filter: blur(10px); opacity: 0; pointer-events: none; transition: opacity .3s .15s; }
+  #tabL { left: 0; border-radius: 0 10px 10px 0; }
+  #tabR { right: 0; border-radius: 10px 0 0 10px; transform: translateY(-50%) rotate(180deg); }
+  body.hide-left #tabL, body.hide-right #tabR { opacity: .85; pointer-events: auto; }
+  .tab:hover { opacity: 1 !important; border-color: var(--accent); }
+
+  /* ---------- HUD (modo limpo) */
+  #hud { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 4;
+         background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px;
+         display: flex; gap: 10px; align-items: center; font-size: 13px; backdrop-filter: blur(10px);
+         opacity: 0; pointer-events: none; transition: opacity .3s; }
+  body.hide-left.hide-right #hud { opacity: 1; pointer-events: auto; }
+  #hud kbd { font: 11px ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+
+  /* ---------- conteúdo */
+  .sec { border-top: 1px solid var(--line); padding: 9px 0 3px; }
+  .sec:first-child { border-top: 0; padding-top: 2px; }
+  .sec h3 { margin: 0 0 6px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .num { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%;
+         background: var(--chip); border: 1px solid var(--line); font-size: 11px; font-weight: 700; }
+  .done .num { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .hint { color: var(--muted); margin: 0 0 6px; font-size: 12.5px; line-height: 1.4; }
+  .status { display: flex; flex-direction: column; gap: 4px; }
+  .chip { background: var(--chip); border-radius: 8px; padding: 4px 9px; font-size: 12px;
+          display: flex; align-items: center; gap: 7px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
   .dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); } .dot.warn { background: var(--warn); }
-  .row { display: grid; grid-template-columns: 120px 1fr auto; gap: 10px; align-items: center;
-         padding: 10px 0; border-top: 1px solid var(--line); }
-  .row:first-of-type { border-top: 0; }
-  .row b { font-size: 14px; }
-  .map { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
-  .map.set { color: var(--ink); }
-  .btns { display: flex; gap: 6px; }
-  button { font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--chip);
-           color: var(--ink); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  .map { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center;
+         padding: 5px 0; border-top: 1px dashed var(--line); }
+  .map:first-of-type { border-top: 0; }
+  .map b { font-size: 13px; }
+  .map .what { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; grid-column: 1 / -1; }
+  .map .what.set { color: var(--ink); }
+  .btns { display: flex; gap: 6px; justify-content: flex-end; }
+  button { font: inherit; font-size: 12.5px; border: 1px solid var(--line); background: var(--chip);
+           color: var(--ink); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
   button:hover { border-color: var(--accent); }
   button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-  button.learning { background: var(--warn); color: #fff; border-color: var(--warn);
-                    animation: pulse 1s infinite; }
+  button.learning { background: var(--warn); color: #fff; border-color: var(--warn); animation: pulse 1s infinite; }
+  button:disabled { opacity: .5; cursor: default; }
   @keyframes pulse { 50% { opacity: .6; } }
-  .ghost { background: transparent; }
-  label { font-size: 14px; display: block; margin: 6px 0 2px; }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; }
+  .monitor { font: 12px ui-monospace, Menlo, monospace; background: var(--chip); border-radius: 8px;
+             padding: 7px 9px; min-height: 30px; overflow-wrap: anywhere; }
+  label { font-size: 13px; display: block; margin: 4px 0 0; }
   input[type=range] { width: 100%; accent-color: var(--accent); }
   .val { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; }
-  .monitor { font: 13px ui-monospace, Menlo, monospace; background: var(--chip); border-radius: 8px;
-             padding: 8px 10px; min-height: 34px; }
-  details { margin-top: 6px; }
-  summary { cursor: pointer; color: var(--muted); font-size: 13px; }
-  pre { font: 12px ui-monospace, Menlo, monospace; white-space: pre-wrap; color: var(--muted);
-        margin: 8px 0 0; max-height: 200px; overflow: auto; }
-  ol { margin: 6px 0 0; padding-left: 20px; } li { margin: 2px 0; }
-  .banner { border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 14px;
-            background: color-mix(in srgb, var(--warn) 18%, var(--card)); border: 1px solid var(--warn); }
-  .hidden { display: none; }
-  main { max-width: 900px; }
-  /* ---------- controlador */
-  .dev-wrap { overflow-x: auto; }
-  .dev3d { border-radius: 12px; overflow: hidden; cursor: grab;
-           background: radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--card) 70%, #8a8f99), var(--card)); }
-  .dev3d:active { cursor: grabbing; }
-  .dev3d canvas { display: block; }
-  .dev { min-width: 640px; background: #1d1f24; border-radius: 12px; padding: 16px 16px 12px;
-         border-left: 6px solid #c8382c; border-right: 6px solid #c8382c; color: #cfd3da;
-         font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
-  .dev-top { display: grid; grid-template-columns: 1fr auto 0.78fr; gap: 14px; align-items: start; }
-  .pads { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; }
-  .pad { aspect-ratio: 1.25; border-radius: 4px; background: #474b55; position: relative;
-         transition: background .25s, box-shadow .25s; }
-  .trk { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; margin-top: 10px; }
-  .btn { height: 15px; border-radius: 3px; background: #5a5e68; position: relative;
-         transition: background .25s, box-shadow .25s; }
-  .btn.red { background: #9a3b3b; }
-  .lbl { display: block; text-align: center; margin-top: 3px; color: #8d929c; white-space: nowrap; }
-  .soft { display: grid; gap: 7px; padding-top: 2px; }
-  .soft .btn { width: 26px; height: 18px; }
-  .knobs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 10px; }
-  .knob { aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #3a3d44, #121316);
-          border: 2px solid #2a2c31; position: relative; transition: box-shadow .25s; }
-  .knob::after { content: ""; position: absolute; left: 50%; top: 6%; width: 3px; height: 30%;
-                 margin-left: -1.5px; background: #e7e9ee; border-radius: 2px;
-                 transform-origin: 50% 147%; transform: rotate(var(--a, 0deg)); transition: transform .12s; }
-  .trans { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 14px; }
-  .keys { display: flex; position: relative; height: 110px; margin-top: 16px; }
-  .wk { flex: 1; background: #f3f3f1; border: 1px solid #9b9b9b; border-radius: 0 0 4px 4px;
-        transition: background .2s; position: relative; }
-  .bk { position: absolute; top: 0; height: 62%; background: #1a1a1a; border-radius: 0 0 3px 3px;
-        z-index: 2; transition: background .2s; }
-  .hit { background: var(--accent) !important; box-shadow: 0 0 12px var(--accent); }
-  .knob.hit { background: radial-gradient(circle at 40% 35%, #3a3d44, #121316) !important; }
-  .b-prev, .b-next { cursor: pointer; }
-  .b-prev { box-shadow: inset 0 0 0 3px #3b82f6; }
-  .b-next { box-shadow: inset 0 0 0 3px #22c55e; }
-  .knob.b-knob { box-shadow: 0 0 0 3px var(--accent); }
-  .badge { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px;
-           font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; pointer-events: none; }
-  .tag { display: inline-block; border-radius: 4px; padding: 0 5px; font-size: 12px; color: #fff; font-weight: 700; }
-  .t-prev { background: #3b82f6; } .t-next { background: #22c55e; } .t-knob { background: var(--accent); }
-  @media (max-width: 560px) {
-    .row { grid-template-columns: 1fr; gap: 6px; }
+  ul.tips { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12.5px; } ul.tips li { margin: 3px 0; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
+  pre { font: 11px ui-monospace, Menlo, monospace; white-space: pre-wrap; color: var(--muted); margin: 6px 0 0; max-height: 150px; overflow: auto; }
+  .foot { padding: 10px 16px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center;
+          gap: 8px; font-size: 12px; color: var(--muted); }
+  .foot a { color: var(--muted); }
+  .banner { position: fixed; z-index: 6; left: 50%; transform: translateX(-50%); bottom: 16px; max-width: 520px;
+            background: var(--panel); border: 1px solid var(--warn); border-radius: 12px; padding: 10px 14px;
+            font-size: 13px; backdrop-filter: blur(10px); box-shadow: 0 6px 24px rgba(0,0,0,.15); }
+  .hidden { display: none !important; }
+  #nogl { position: fixed; inset: 0; display: grid; place-items: center; z-index: 3; color: var(--muted); text-align: center; padding: 16px; }
+  body.webgl-ok #nogl { display: none; }
+
+  @media (max-width: 760px) {
+    :root { --lw: calc(100vw - 24px); --rw: calc(100vw - 24px); }
   }
 </style>
 </head>
 <body>
-<main>
-  <header><h1>ANA <span>Preset</span> Knob</h1></header>
-  <p class="sub">Troque os presets do ANA 2 no Ableton com qualquer knob ou pad do seu controlador.</p>
+<div id="stage"></div>
+<div id="nogl">Carregando a vista 3D…<br><small>Se não aparecer, use a <a href="/classic">versão clássica</a>.</small></div>
 
-  <div id="offline" class="banner hidden">O agente não está respondendo. Abra <b>“Iniciar ANA Preset Knob”</b> ou reinstale.</div>
-  <div id="permBanner" class="banner hidden">
-    Falta a permissão de <b>Acessibilidade</b> para clicar nas setas do ANA.
-    <button class="primary" onclick="post('/api/permission')">Abrir Ajustes</button>
-    <div class="hint" style="margin:6px 0 0">Ative <b>Python</b> na lista e volte aqui.</div>
-  </div>
+<!-- ================= barra esquerda: instruções e mapeamento ================= -->
+<aside class="side" id="left">
+  <header>
+    <h1>ANA <span>Preset</span> Knob</h1>
+    <button class="icon" title="Recolher (H)" onclick="toggle('left')">‹</button>
+  </header>
+  <div class="scroll">
+    <div class="sec">
+      <div class="status" id="status"></div>
+    </div>
 
-  <section class="card">
-    <h2>Status</h2>
-    <div class="status" id="status"></div>
-  </section>
+    <div class="sec" id="s1">
+      <h3><span class="num">1</span> Abra o ANA 2 no Ableton</h3>
+      <p class="hint">Clique na chave inglesa do device para abrir a janela do plugin (pode ficar atrás de outros apps).</p>
+    </div>
 
-  <section class="card">
-    <h2>Seu controlador</h2>
-    <p class="hint">Mexa em qualquer pad, knob, botão ou tecla: ele acende aqui. Arraste para girar a vista 3D, role para aproximar. Clique nos pads ◀ ▶ do desenho para trocar o preset pelo navegador. Controles mapeados aparecem marcados (<span class="tag t-prev">◀</span> <span class="tag t-next">▶</span> <span class="tag t-knob">knob</span>).</p>
-    <div id="dev3dhost" class="dev3d hidden"></div>
-    <div class="dev-wrap" id="dev2d"><div class="dev" id="dev">
-      <div class="dev-top">
-        <div class="dev-left">
-          <div class="pads" id="pads"></div>
-          <div class="trk" id="trk"></div>
-        </div>
-        <div class="soft" id="soft"></div>
-        <div class="dev-right">
-          <div class="knobs" id="knobs"></div>
-          <div class="trans" id="trans"></div>
-        </div>
+    <div class="sec" id="s2">
+      <h3><span class="num">2</span> Mapeie seus controles</h3>
+      <p class="hint">Clique em <b>Aprender</b> e mexa no controle. Use um knob, dois pads, ou os três.</p>
+      <div class="map">
+        <b><span class="sw" style="background:var(--accent)"></span>Knob</b>
+        <div class="btns"><button id="l-knob">Aprender</button><button onclick="clearSlot('knob')">Limpar</button></div>
+        <div class="what" id="m-knob">—</div>
       </div>
-      <div class="keys" id="keys"></div>
-    </div></div>
-    <div class="monitor" id="devmon" style="margin-top:10px">—</div>
-  </section>
-
-  <section class="card">
-    <h2><span class="num">1</span> Mapeie seus controles</h2>
-    <p class="hint">Clique em <b>Aprender</b> e mexa no controle do seu equipamento. Use um knob para girar entre presets, ou dois pads/botões (um para cada lado). Pode usar os três ao mesmo tempo.</p>
-    <div class="row">
-      <b>Knob</b>
-      <div class="map" id="m-knob">—</div>
-      <div class="btns"><button id="l-knob" onclick="learn('knob')">Aprender</button><button class="ghost" onclick="clearSlot('knob')">Limpar</button></div>
+      <div class="map">
+        <b><span class="sw" style="background:var(--prev)"></span>◀ Anterior</b>
+        <div class="btns"><button id="l-prev">Aprender</button><button onclick="clearSlot('prev')">Limpar</button></div>
+        <div class="what" id="m-prev">—</div>
+      </div>
+      <div class="map">
+        <b><span class="sw" style="background:var(--next)"></span>▶ Próximo</b>
+        <div class="btns"><button id="l-next">Aprender</button><button onclick="clearSlot('next')">Limpar</button></div>
+        <div class="what" id="m-next">—</div>
+      </div>
     </div>
-    <div class="row">
-      <b>◀ Anterior</b>
-      <div class="map" id="m-prev">—</div>
-      <div class="btns"><button id="l-prev" onclick="learn('prev')">Aprender</button><button class="ghost" onclick="clearSlot('prev')">Limpar</button></div>
-    </div>
-    <div class="row">
-      <b>▶ Próximo</b>
-      <div class="map" id="m-next">—</div>
-      <div class="btns"><button id="l-next" onclick="learn('next')">Aprender</button><button class="ghost" onclick="clearSlot('next')">Limpar</button></div>
-    </div>
-    <label style="margin-top:12px">Monitor MIDI (o que está chegando agora)</label>
-    <div class="monitor" id="monitor">Mexa em qualquer controle…</div>
-  </section>
 
-  <section class="card">
-    <h2><span class="num">2</span> Sensibilidade do knob</h2>
-    <label>Cliques do knob por preset: <span class="val" id="stepv"></span></label>
-    <input type="range" id="step" min="1" max="40" oninput="stepv.textContent=this.value" onchange="save({step:+this.value})">
-    <p class="hint" style="margin-top:4px">Maior = precisa girar mais para trocar. Pads trocam 1 preset por toque.</p>
-    <label>Pausa entre trocas (ms): <span class="val" id="intv"></span></label>
-    <input type="range" id="interval" min="50" max="600" step="10" oninput="intv.textContent=this.value" onchange="save({interval_ms:+this.value})">
-    <p class="hint" style="margin-top:4px">Aumente se presets pesados estiverem sendo pulados.</p>
-  </section>
-
-  <section class="card">
-    <h2><span class="num">3</span> Teste e calibração</h2>
-    <p class="hint">Com a janela do ANA 2 aberta no Ableton (chave inglesa no device), teste as setas:</p>
-    <div class="btns" style="margin-bottom:12px">
-      <button onclick="post('/api/test',{dir:-1})">◀ Testar anterior</button>
-      <button onclick="post('/api/test',{dir:1})">▶ Testar próximo</button>
+    <div class="sec" id="s3">
+      <h3><span class="num">3</span> Teste</h3>
+      <p class="hint">Mexa no controle mapeado ou clique nos pads coloridos do desenho.</p>
+      <div class="btns" style="justify-content:flex-start">
+        <button onclick="arrow(-1,'prev')">◀ Anterior</button>
+        <button onclick="arrow(1,'next')">Próximo ▶</button>
+      </div>
     </div>
-    <p class="hint">Se o clique errar a seta, calibre. Clique abaixo, <b>volte para o Ableton</b> e pouse o mouse sobre a seta indicada até a contagem terminar.</p>
-    <button class="primary" id="calbtn" onclick="post('/api/calibrate')">Calibrar setas</button>
-    <div class="monitor" id="calib" style="margin-top:10px">—</div>
-  </section>
 
-  <section class="card">
-    <h2>Como funciona</h2>
-    <ol class="hint">
-      <li>O agente liga sozinho com o Mac e fica em segundo plano.</li>
-      <li>Ele reconhece qualquer controlador MIDI quando você conecta — não precisa reconfigurar.</li>
-      <li>O ANA 2 não aceita MIDI nas setas de preset; o agente clica nelas por você.</li>
-      <li>Pode estar em qualquer app: se a janela do ANA estiver oculta, o agente traz o Ableton para frente, troca o preset e volta para onde você estava. Basta deixar a janela do plugin aberta (chave inglesa).</li>
-      <li>Se o seu controlador também comanda o Ableton (Control Surface), escolha um controle que não esteja mapeado lá.</li>
-    </ol>
-    <details><summary>Registro</summary><pre id="log"></pre></details>
-  </section>
-</main>
+    <div class="sec">
+      <h3>Monitor MIDI</h3>
+      <div class="monitor" id="monitor">Mexa em qualquer controle…</div>
+    </div>
+  </div>
+  <div class="foot">
+    <span>Pronto? Recolha os painéis.</span>
+    <button class="primary" onclick="clean()">Modo limpo</button>
+  </div>
+</aside>
+
+<!-- ================= barra direita: ajustes ================= -->
+<aside class="side" id="right">
+  <header>
+    <button class="icon" title="Recolher (H)" onclick="toggle('right')">›</button>
+    <h2>Ajustes</h2>
+  </header>
+  <div class="scroll">
+    <div class="sec">
+      <h3>Sensibilidade do knob</h3>
+      <label>Cliques por preset: <span class="val" id="stepv"></span></label>
+      <input type="range" id="step" min="1" max="40" oninput="stepv.textContent=this.value" onchange="save({step:+this.value})">
+      <label>Pausa entre trocas: <span class="val" id="intv"></span> ms</label>
+      <input type="range" id="interval" min="50" max="600" step="10" oninput="intv.textContent=this.value" onchange="save({interval_ms:+this.value})">
+      <p class="hint" style="margin-top:4px">O anel colorido em volta do knob mostra quanto falta para trocar.</p>
+    </div>
+    <div class="sec">
+      <h3>Calibrar as setas</h3>
+      <p class="hint">Só se o clique errar a seta do ANA. Clique, <b>vá para o Ableton</b> e pouse o mouse sobre a seta indicada até a contagem terminar.</p>
+      <button class="primary" id="calbtn" onclick="post('/api/calibrate')">Calibrar</button>
+      <div class="monitor" id="calib" style="margin-top:8px">—</div>
+    </div>
+    <div class="sec">
+      <h3>Como funciona</h3>
+      <ul class="tips">
+        <li>Liga sozinho com o Mac e reconhece o controlador ao conectar.</li>
+        <li>Funciona de qualquer app: se a janela do ANA estiver oculta, o Ableton vem para frente e depois você volta para onde estava.</li>
+        <li>Se o controlador também comanda o Ableton (Control Surface), escolha controles que não estejam mapeados lá.</li>
+        <li>Atalho: <b>H</b> mostra/esconde os painéis.</li>
+      </ul>
+    </div>
+    <div class="sec">
+      <details><summary>Registro</summary><pre id="log"></pre></details>
+    </div>
+  </div>
+  <div class="foot"><a href="/classic">Versão clássica</a><span>v3</span></div>
+</aside>
+
+<button class="tab" id="tabL" onclick="toggle('left')">MAPEAMENTO</button>
+<button class="tab" id="tabR" onclick="toggle('right')">AJUSTES</button>
+<div id="hud"><span class="dot" id="hudDot"></span><span id="hudText">pronto</span><span style="color:var(--muted)">·</span><span style="color:var(--muted)"><kbd>H</kbd> painéis</span></div>
+
+<div id="offline" class="banner hidden">O agente não está respondendo. Rode o <b>Instalar.command</b> de novo.</div>
+<div id="permBanner" class="banner hidden">Falta a permissão de <b>Acessibilidade</b> para clicar nas setas.
+  <button class="primary" onclick="post('/api/permission')">Abrir Ajustes</button></div>
+
 <script type="importmap">{"imports":{"three":"/vendor/three.module.min.js"}}</script>
 <script type="module" src="/controller3d.js"></script>
 <script>
 const $ = id => document.getElementById(id);
-let editing = false;
-document.addEventListener('focusin', e => { if (e.target.type === 'range') editing = true; });
-document.addEventListener('focusout', e => { if (e.target.type === 'range') editing = false; });
+let seq = -1, bindings = {}, editing = false;
+const knobAngle = {}, keyBase = { v: 48 };
 
+// ---------- painéis
+function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function sideWidths() {
+  const narrow = innerWidth <= 760, b = document.body.classList;
+  const l = b.contains('hide-left') || narrow ? 0 : $('left').offsetWidth + 12;
+  const r = b.contains('hide-right') || narrow ? 0 : $('right').offsetWidth + 12;
+  return [l, r];
+}
+function relayout() { if (window.dev3d) window.dev3d.layout(...sideWidths()); }
+function savePanels() { store('panels', (document.body.className.match(/hide-\w+/g) || []).join(' ')); }
+function toggle(side) { document.body.classList.toggle('hide-' + side); savePanels(); relayout(); }
+function clean() { document.body.classList.add('hide-left', 'hide-right'); savePanels(); relayout(); }
+function showAll() { document.body.classList.remove('hide-left', 'hide-right'); savePanels(); relayout(); }
+(function restore() {
+  const p = load('panels');
+  if (p !== null) { document.body.classList.remove('hide-left', 'hide-right'); p.split(' ').filter(Boolean).forEach(c => document.body.classList.add(c)); }
+})();
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === 'h' || e.key === 'H') {
+    const b = document.body.classList;
+    (b.contains('hide-left') && b.contains('hide-right')) ? showAll() : clean();
+  }
+});
+addEventListener('resize', relayout);
+(function waitGL() { if (window.dev3d) relayout(); else setTimeout(waitGL, 100); })();
+
+// ---------- API
 async function post(path, body = {}) {
-  try {
-    await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  } catch (e) {}
-  tick();
+  try { await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); } catch (e) {}
 }
 const learn = slot => post('/api/learn', { slot });
 const clearSlot = slot => post('/api/clear', { slot });
 const save = obj => post('/api/settings', obj);
+const arrow = (dir, source) => post('/api/test', { dir, source });
+addEventListener('virtual-arrow', e => arrow(e.detail.dir, e.detail.dir < 0 ? 'prev' : 'next'));
+document.addEventListener('focusin', e => { if (e.target.type === 'range') editing = true; });
+document.addEventListener('focusout', e => { if (e.target.type === 'range') editing = false; });
 
-function chip(ok, text) {
-  const cls = ok === true ? 'ok' : ok === false ? 'bad' : 'warn';
-  return `<span class="chip"><span class="dot ${cls}"></span>${text}</span>`;
-}
-
-
-// ---------------- desenho do controlador (layout APC Key 25 mk2)
-let seq = -1;
-const knobAngle = {}, keyBase = { v: 48 };
-const el = (cls, id, label) => {
-  const d = document.createElement('div'); d.className = cls; if (id) d.id = id;
-  if (label !== undefined) { const w = document.createElement('div'); w.append(d);
-    const l = document.createElement('span'); l.className = 'lbl'; l.textContent = label; w.append(l); return w; }
-  return d;
-};
-(function buildDevice() {
-  for (let r = 4; r >= 0; r--) for (let c = 0; c < 8; c++) $('pads').append(el('pad', 'c-note-' + (r * 8 + c)));
-  ['▲','▼','◀','▶','Volume','Pan','Send','Device'].forEach((t, i) => $('trk').append(el('btn red', 'c-note-' + (64 + i), t)));
-  [['Clip Stop',82],['Solo',83],['Mute',84],['Rec Arm',85],['Select',86],['Stop All',81],['Shift',98]]
-    .forEach(([t, n]) => $('soft').append(el('btn', 'c-note-' + n, t)));
-  for (let i = 0; i < 8; i++) $('knobs').append(el('knob', 'c-cc-' + (48 + i), 'K' + (i + 1)));
-  [['Sustain','k-cc-64'],['Oct −',null],['Oct +',null],['▶/II','c-note-91'],['●','c-note-93']]
-    .forEach(([t, id]) => $('trans').append(el('btn', id, t)));
-  // 25 teclas: 15 brancas
-  const white = [0,2,4,5,7,9,11], blackPos = {1:0,3:1,6:3,8:4,10:5};
-  let wi = 0;
-  for (let n = 0; n <= 24; n++) {
-    const pc = n % 12, oct = Math.floor(n / 12);
-    if (white.includes(pc)) { $('keys').append(el('wk', 'key-' + n)); wi++; }
-  }
-  const W = 100 / 15;
-  for (let n = 0; n <= 24; n++) {
-    const pc = n % 12, oct = Math.floor(n / 12);
-    if (pc in blackPos) {
-      const b = el('bk', 'key-' + n);
-      const left = (oct * 7 + blackPos[pc] + 1) * W - W * 0.3;
-      b.style.left = left + '%'; b.style.width = (W * 0.6) + '%';
-      $('keys').append(b);
-    }
-  }
-})();
-
+// ---------- MIDI → desenho
 function ctlId(e) {
-  const p = e.port.toLowerCase();
+  const p = (e.port || '').toLowerCase();
   if (p.includes('control')) return (e.type === 'cc' ? 'c-cc-' : 'c-note-') + e.number;
   if (p.includes('key')) {
     if (e.type === 'cc') return 'k-cc-' + e.number;
-    let n = e.number;
+    const n = e.number;
     if (n < keyBase.v || n > keyBase.v + 24) keyBase.v = n - (n % 12);
     return 'key-' + (n - keyBase.v);
   }
   return null;
 }
+const bindId = slot => { const r = bindings[slot] && bindings[slot].raw; return r ? ctlId(r) : null; };
 function onEvent(e) {
-  const name = (e.type === 'cc' ? 'CC ' : 'Nota ') + e.number + ' = ' + e.value + ' · canal ' + (e.channel + 1) + ' · ' + e.port;
-  $('devmon').textContent = name;
-  const id = ctlId(e), node = id && $(id);
-  if (window.dev3d && id) {
-    if (id.startsWith('c-cc-') && id !== 'k-cc-64') {
-      const d = e.value < 64 ? e.value : e.value - 128;
-      knobAngle[id] = (knobAngle[id] || 0) + d * 6;
-      window.dev3d.knob(id, knobAngle[id]);
-    } else if (id.startsWith('key-') || id.startsWith('k-cc-')) window.dev3d.hit(id, e.value > 0);
-    else if (e.value > 0) window.dev3d.hit(id, true);
+  const d = window.dev3d;
+  if (e.type === 'action') {
+    const slot = e.source === 'virtual' ? (e.dir < 0 ? 'prev' : 'next') : e.source;
+    if (d) d.action(e.dir, bindId(slot), e.count);
+    return;
   }
-  if (!node) return;
-  if (node.classList.contains('knob')) {
-    const d = e.value < 64 ? e.value : e.value - 128;   // relativo
-    if (!window.dev3d) knobAngle[id] = (knobAngle[id] || 0) + d * 6;
-    node.style.setProperty('--a', knobAngle[id] + 'deg');
-    flash(node, 300); return;
-  }
-  const isKey = node.classList.contains('wk') || node.classList.contains('bk');
-  if (isKey || id.startsWith('k-cc-')) { node.classList.toggle('hit', e.value > 0); return; }
-  if (e.value > 0) flash(node, 350);
+  $('monitor').textContent = (e.type === 'cc' ? 'CC ' : 'Nota ') + e.number + ' = ' + e.value + ' · canal ' + (e.channel + 1) + ' · ' + e.port;
+  const id = ctlId(e); if (!d || !id) return;
+  if (id.startsWith('c-cc-')) {
+    const v = e.value < 64 ? e.value : e.value - 128;
+    knobAngle[id] = (knobAngle[id] || 0) + v * 6; d.knob(id, knobAngle[id]);
+  } else if (id.startsWith('key-') || id.startsWith('k-cc-')) d.hit(id, e.value > 0);
+  else if (e.value > 0) d.hit(id, true);
 }
-function flash(node, ms) {
-  node.classList.add('hit'); clearTimeout(node._t);
-  node._t = setTimeout(() => node.classList.remove('hit'), ms);
+function markBindings() {
+  if (!window.dev3d) return;
+  const map = {};
+  for (const slot of ['prev', 'next', 'knob']) { const id = bindId(slot); if (id) map[id] = slot; }
+  window.dev3d.bindings(map);
 }
-window.addEventListener('virtual-arrow', e => post('/api/test', { dir: e.detail }));
-document.addEventListener('click', e => {           // desenho 2D: clicar nos pads ◀ ▶
-  const n = e.target.closest('.b-prev, .b-next');
-  if (n) { flash(n, 300); post('/api/test', { dir: n.classList.contains('b-prev') ? -1 : 1 }); }
-});
-function markBindings(b) {
-  if (window.dev3d) {
-    const map = {};
-    for (const slot of ['prev','next','knob']) {
-      const r = b[slot] && b[slot].raw; if (!r) continue;
-      const id = ctlId({ port: r.port, type: r.type, number: r.number }); if (id) map[id] = slot;
-    }
-    window.dev3d.bindings(map);
-  }
-  document.querySelectorAll('.b-prev,.b-next,.b-knob').forEach(n => n.classList.remove('b-prev','b-next','b-knob'));
-  document.querySelectorAll('.badge').forEach(n => n.remove());
-  for (const [slot, cls, sym] of [['prev','b-prev','◀'],['next','b-next','▶'],['knob','b-knob','']]) {
-    const r = b[slot] && b[slot].raw; if (!r) continue;
-    const id = ctlId({ port: r.port, type: r.type, number: r.number }), node = id && $(id);
-    if (!node) continue;
-    node.classList.add(cls);
-    if (sym) { const g = document.createElement('div'); g.className = 'badge'; g.textContent = sym; node.append(g); }
-  }
+
+// ---------- estado
+function chip(ok, text) {
+  const cls = ok === true ? 'ok' : ok === false ? 'bad' : 'warn';
+  return `<div class="chip"><span class="dot ${cls}"></span><span>${text}</span></div>`;
 }
 async function tick() {
   let s;
   try { s = await (await fetch('/api/state?since=' + seq)).json(); $('offline').classList.add('hidden'); }
   catch (e) { $('offline').classList.remove('hidden'); return; }
-
+  bindings = s.bindings;
   if (seq < 0) seq = s.seq; else { s.events.forEach(onEvent); seq = s.seq; }
-  markBindings(s.bindings);
-  const ports = s.ports.length ? s.ports.join(', ') : 'nenhum';
+  markBindings();
+
+  const midiOk = s.ports.length > 0;
   $('status').innerHTML =
-    chip(s.ports.length > 0, `MIDI: ${ports}`) +
-    chip(s.window, s.window ? 'Janela do ANA 2 visível' : ('Janela do ANA 2 não encontrada' + (s.windows && s.windows.length ? ' · janelas do Live: ' + s.windows.join(', ') : ' · nenhuma janela do Live visível'))) +
+    chip(midiOk, midiOk ? 'MIDI: ' + [...new Set(s.ports.map(p => p.replace(/\s+(Keys|Control|MIDI \d+)$/i, '')))].join(', ') : 'Nenhum controlador MIDI conectado') +
+    chip(s.window ? true : null, s.window ? 'Janela do ANA 2 encontrada' : 'Janela do ANA 2 não visível agora') +
     chip(s.can_click, s.can_click === false ? 'Sem permissão para clicar' : 'Permissão para clicar OK');
   $('permBanner').classList.toggle('hidden', s.can_click !== false);
 
+  const anyBind = ['knob', 'prev', 'next'].some(k => s.bindings[k].raw);
+  $('s1').classList.toggle('done', !!s.window);
+  $('s2').classList.toggle('done', anyBind);
+  $('hudDot').className = 'dot ' + (midiOk && anyBind ? 'ok' : 'warn');
+  $('hudText').textContent = !midiOk ? 'conecte o controlador' : !anyBind ? 'nada mapeado' : 'pronto';
+
   for (const slot of ['knob', 'prev', 'next']) {
-    const b = s.bindings[slot], el = $('m-' + slot), btn = $('l-' + slot);
-    const learning = s.learn === slot;
-    el.textContent = learning
-      ? (slot === 'knob' ? 'Gire o knob agora…' : 'Aperte o pad/botão agora…')
-      : b.text;
+    const b = s.bindings[slot], el = $('m-' + slot), btn = $('l-' + slot), learning = s.learn === slot;
+    el.textContent = learning ? (slot === 'knob' ? 'Gire o knob agora…' : 'Aperte o pad/botão agora…') : (b.raw ? b.text : 'não mapeado');
     el.classList.toggle('set', !!b.raw);
     btn.textContent = learning ? 'Cancelar' : 'Aprender';
     btn.classList.toggle('learning', learning);
     btn.onclick = learning ? () => post('/api/cancel') : () => learn(slot);
   }
-  $('monitor').textContent = s.last || 'Mexa em qualquer controle…';
-
   if (!editing) {
     $('step').value = s.step; $('stepv').textContent = s.step;
     $('interval').value = s.interval_ms; $('intv').textContent = s.interval_ms;
   }
+  const kid = bindId('knob');
+  if (window.dev3d && kid) window.dev3d.progress(kid, Math.abs(s.acc || 0) / Math.max(1, s.step), Math.sign(s.acc || 0));
+
   const c = s.calib;
   $('calib').textContent =
-    c.state === 'counting' ? `Pouse o mouse sobre a seta ${c.target === 'prev' ? '◀ ANTERIOR' : '▶ PRÓXIMO'} do ANA… ${c.count}s`
+    c.state === 'counting' ? `Mouse sobre a seta ${c.target === 'prev' ? '◀ ANTERIOR' : '▶ PRÓXIMO'} do ANA… ${c.count}s`
     : c.state === 'done' ? 'Calibrado ✔'
-    : c.state === 'error' ? 'Não achei a janela do ANA 2. Abra o plugin e deixe o Ableton na frente.'
-    : '—';
+    : c.state === 'error' ? 'Não achei a janela do ANA 2. Abra o plugin e deixe o Ableton na frente.' : '—';
   $('calbtn').disabled = c.state === 'counting';
   $('log').textContent = s.log.join('\n');
 }
-tick();
-setInterval(tick, 150);
+tick(); setInterval(tick, 120);
 </script>
 </body>
 </html>

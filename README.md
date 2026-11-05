@@ -6,7 +6,8 @@ O ANA 2 não aceita Program Change nem mapeamento MIDI das setas de preset ([con
 
 ## Recursos
 
-- **Interface com instruções** em `http://127.0.0.1:8765`
+- **Interface 3D em tela cheia** em `http://127.0.0.1:8765`: instruções e ajustes em painéis laterais recolhíveis (tecla **H**), e no modo limpo cada ação aparece animada na cena
+- Versão clássica (página com rolagem) em `http://127.0.0.1:8765/classic`
 - **Aprender**: clique, gire um knob ou aperte um pad, pronto
 - **Knob** (relativo/infinito ou absoluto, detectado sozinho) e/ou **dois pads/botões** (◀ e ▶, um preset por toque)
 - **Sensibilidade** ajustável (cliques de knob por preset)
