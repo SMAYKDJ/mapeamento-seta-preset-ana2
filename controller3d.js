@@ -150,7 +150,7 @@ const screen = new THREE.Mesh(new THREE.PlaneGeometry(15, 15 * SCR_H / SCR_W),
   new THREE.MeshBasicMaterial({ map: scrTex, transparent: true }));
 screen.position.set(0, 6.2, -14.2); screen.rotation.x = -0.18;
 scene.add(screen);
-const scr = { t: 1, dir: 0, label: '', count: 0 };
+const scr = { t: 1, dir: 0, label: '', count: 0, name: null, sub: '' };
 
 function roundRect(c, x, y, w, h, r) {
   c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
@@ -174,9 +174,13 @@ function drawScreen() {
   c.save(); c.beginPath(); c.rect(200, 90, SCR_W - 400, 180); c.clip();
   const off = scr.dir * (1 - Math.min(1, scr.t * 2.2)) * 160;
   c.globalAlpha = a > 0 ? 1 : 0.55;
-  c.fillStyle = '#eceef2'; c.textAlign = 'center'; c.font = '700 62px -apple-system, Segoe UI, sans-serif';
-  c.fillText(scr.label || 'aguardando', SCR_W / 2 + off, 192);
-  if (scr.count > 1 && a > 0) {
+  c.fillStyle = '#eceef2'; c.textAlign = 'center';
+  const main = scr.name || scr.label || 'aguardando';
+  let fs = 62; c.font = `700 ${fs}px -apple-system, Segoe UI, sans-serif`;
+  while (c.measureText(main).width > SCR_W - 440 && fs > 26) { fs -= 2; c.font = `700 ${fs}px -apple-system, Segoe UI, sans-serif`; }
+  c.fillText(main, SCR_W / 2 + off, 192);
+  if (scr.sub) { c.font = '500 26px -apple-system, Segoe UI, sans-serif'; c.fillStyle = '#9aa0ab'; c.fillText(scr.sub, SCR_W / 2 + off, 240); }
+  if (scr.count > 1 && a > 0 && !scr.sub) {
     c.font = '600 32px -apple-system, Segoe UI, sans-serif'; c.fillStyle = '#e8743b';
     c.fillText('×' + scr.count, SCR_W / 2 + off, 240);
   }
@@ -332,6 +336,10 @@ window.dev3d = {
     }
   },
   progress(id, frac, dir) { const kn = knobs.get(id); if (kn) { kn.frac = frac; if (dir) kn.dir = dir; } },
+  preset(name, index, total) {
+    scr.name = name; scr.sub = (index != null && total) ? `${index + 1} / ${total}` : '';
+    scr.t = Math.min(scr.t, 0.35); drawScreen();
+  },
   layout, action,
 };
 

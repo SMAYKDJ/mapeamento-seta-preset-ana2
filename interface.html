@@ -193,7 +193,8 @@
       <h3>Como funciona</h3>
       <ul class="tips">
         <li>Liga sozinho com o Mac e reconhece o controlador ao conectar.</li>
-        <li>Funciona de qualquer app: se a janela do ANA estiver oculta, o Ableton vem para frente e depois você volta para onde estava.</li>
+        <li>Com a <b>ponte do Ableton</b> ativa, a troca acontece sem sair do app em que você está. Sem a ponte, o Ableton vem para frente por um instante e você volta sozinho.</li>
+        <li>Para ir ao Ableton quando quiser: <b>⌘ Tab</b>.</li>
         <li>Se o controlador também comanda o Ableton (Control Surface), escolha controles que não estejam mapeados lá.</li>
         <li>Atalho: <b>H</b> mostra/esconde os painéis.</li>
       </ul>
@@ -275,6 +276,7 @@ function ctlId(e) {
 const bindId = slot => { const r = bindings[slot] && bindings[slot].raw; return r ? ctlId(r) : null; };
 function onEvent(e) {
   const d = window.dev3d;
+  if (e.type === 'preset') { if (d && e.name) d.preset(e.name, e.index, e.total); return; }
   if (e.type === 'action') {
     const slot = e.source === 'virtual' ? (e.dir < 0 ? 'prev' : 'next') : e.source;
     if (d) d.action(e.dir, bindId(slot), e.count);
@@ -300,6 +302,16 @@ function chip(ok, text) {
   const cls = ok === true ? 'ok' : ok === false ? 'bad' : 'warn';
   return `<div class="chip"><span class="dot ${cls}"></span><span>${text}</span></div>`;
 }
+function bridgeChip(b) {
+  const st = b && b.state;
+  if (st === 'ativa') {
+    const d = b.devices.find(x => x.presets > 1);
+    return chip(true, 'Ponte do Ableton ativa · sem trocar de app' + (d ? ` (${d.presets} presets)` : ''));
+  }
+  if (st === 'sem lista') return chip(null, 'Ponte ativa, mas o ANA não publica a lista de presets · usando clique');
+  if (st === 'sem ANA') return chip(null, 'Ponte ativa, nenhum ANA no set');
+  return chip(null, 'Ponte do Ableton desligada · usando clique (Ableton pisca)');
+}
 async function tick() {
   let s;
   try { s = await (await fetch('/api/state?since=' + seq)).json(); $('offline').classList.add('hidden'); }
@@ -312,7 +324,8 @@ async function tick() {
   $('status').innerHTML =
     chip(midiOk, midiOk ? 'MIDI: ' + [...new Set(s.ports.map(p => p.replace(/\s+(Keys|Control|MIDI \d+)$/i, '')))].join(', ') : 'Nenhum controlador MIDI conectado') +
     chip(s.window ? true : null, s.window ? 'Janela do ANA 2 encontrada' : 'Janela do ANA 2 não visível agora') +
-    chip(s.can_click, s.can_click === false ? 'Sem permissão para clicar' : 'Permissão para clicar OK');
+    chip(s.can_click, s.can_click === false ? 'Sem permissão para clicar' : 'Permissão para clicar OK') +
+    bridgeChip(s.bridge);
   $('permBanner').classList.toggle('hidden', s.can_click !== false);
 
   const anyBind = ['knob', 'prev', 'next'].some(k => s.bindings[k].raw);

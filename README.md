@@ -28,6 +28,16 @@ Para remover: **`Desinstalar.command`**.
 
 Requer Python 3 (`brew install python` ou python.org).
 
+## Troca 100% em segundo plano (ponte do Ableton)
+
+O instalador também copia um *Remote Script* (`ANAPresetBridge`) para a User Library do Ableton. Com ele ativo, o preset é trocado pela API do próprio Live — sem janela, sem clique e sem tirar você do app em que está.
+
+1. Reinicie o Ableton Live.
+2. **Preferências → Link, Tempo e MIDI → Superfície de controle**: escolha **ANAPresetBridge** num slot livre (Entrada/Saída: Nenhuma).
+3. A interface mostra "Ponte do Ableton ativa" e a tela 3D passa a exibir o **nome do preset**.
+
+Funciona se a versão do ANA 2 no set publicar a lista de presets para o Live; se não publicar, a interface avisa e o agente continua usando o clique nas setas (o Ableton aparece por um instante e você volta sozinho). Se a versão VST3 não publicar, teste a versão VST2 ou AU do ANA 2.
+
 ## Uso
 
 1. No Ableton, abra a janela do ANA 2 (chave inglesa no device).

@@ -17,6 +17,18 @@ mkdir -p "$APP" "$HOME/Library/LaunchAgents"
 cp "$SRC/ana_preset_agent.py" "$SRC/interface.html" "$SRC/controller3d.js" "$SRC/interface_classic.html" "$SRC/controller3d_classic.js" "$APP/"
 mkdir -p "$APP/vendor" && cp "$SRC/vendor/"* "$APP/vendor/"
 
+# Ponte do Ableton (Remote Script): troca o preset sem sair do app em que você está
+RS="$HOME/Music/Ableton/User Library/Remote Scripts"
+if [ -d "$HOME/Music/Ableton/User Library" ]; then
+  mkdir -p "$RS/ANAPresetBridge"
+  cp "$SRC/ableton_remote_script/ANAPresetBridge/"*.py "$RS/ANAPresetBridge/"
+  echo "Ponte do Ableton instalada em: $RS/ANAPresetBridge"
+  BRIDGE_OK=1
+else
+  echo "Não achei a User Library do Ableton em ~/Music/Ableton. Copie a pasta"
+  echo "ableton_remote_script/ANAPresetBridge para 'User Library/Remote Scripts' manualmente."
+fi
+
 if [ ! -x "$APP/venv/bin/python" ]; then
   echo "Criando ambiente Python..."
   "$PY" -m venv "$APP/venv"
@@ -51,3 +63,10 @@ echo "Pronto! O ANA Preset Knob agora liga sozinho com o Mac."
 echo "Interface: http://127.0.0.1:8765  (ou dois cliques em 'Abrir interface.command')"
 echo "Na primeira vez, o macOS vai pedir permissões (Acessibilidade e controle do"
 echo "System Events) para o Python — aceite as duas."
+if [ -n "$BRIDGE_OK" ]; then
+  echo
+  echo "Para trocar presets SEM sair do navegador (opcional):"
+  echo "  1. Reinicie o Ableton Live."
+  echo "  2. Preferências → Link, Tempo e MIDI → Superfície de controle: escolha"
+  echo "     'ANAPresetBridge' num slot livre (Entrada e Saída: Nenhuma)."
+fi

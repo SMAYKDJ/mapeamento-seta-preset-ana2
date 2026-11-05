@@ -47,6 +47,8 @@ DEFAULTS = {
     "restore_mouse": True,
     "auto_focus_live": True,  # traz o Ableton para frente se a janela do ANA estiver oculta
     "return_focus": True,     # depois do clique, volta para o app em que você estava
+    "use_bridge": True,       # tenta trocar pelo Remote Script ANAPresetBridge (sem janela)
+    "bridge_match": "ANA",
     "ref_width": 1054.0,
     "prev": [517.0, 55.8],
     "next": [536.5, 55.8],
@@ -306,6 +308,26 @@ def request_click_permission():
                     "?Privacy_Accessibility"])
 
 
+# ===================================================================== ponte com o Ableton
+
+BRIDGE_ADDR = ("127.0.0.1", 9877)
+
+
+def bridge_call(msg, timeout=0.35):
+    """Fala com o Remote Script ANAPresetBridge dentro do Live. None = sem resposta."""
+    import socket as _s
+    sock = _s.socket(_s.AF_INET, _s.SOCK_DGRAM)
+    sock.settimeout(timeout)
+    try:
+        sock.sendto(json.dumps(msg).encode(), BRIDGE_ADDR)
+        data, _ = sock.recvfrom(65536)
+        return json.loads(data.decode())
+    except Exception:
+        return None
+    finally:
+        sock.close()
+
+
 # ===================================================================== MIDI
 
 def decode(msg):
@@ -390,6 +412,7 @@ class Engine:
         self.calib = {"state": "idle", "count": 0, "target": None}
         self.window_seen = None
         self.events = deque(maxlen=300)   # para a interface acender os controles
+        self.bridge = {"state": "desconhecido", "devices": [], "checked": 0.0}
         self.seq = 0
 
     # ---------- entrada MIDI
@@ -501,6 +524,12 @@ class Engine:
                     activate(ra)
                 time.sleep(0.005)
                 continue
+            # 1º: pela ponte do Ableton (100% em segundo plano, sem janela)
+            if self.try_bridge(1 if p > 0 else -1):
+                with self.lock:
+                    self.pending -= 1 if p > 0 else -1
+                time.sleep(self.cfg.get("interval_ms") / 1000.0)
+                continue
             win = find_window(self.cfg.get("window_match"))
             back_to = None
             if not win and self.cfg.get("auto_focus_live"):
@@ -544,6 +573,37 @@ class Engine:
                     self.return_app = back_to
                 if getattr(self, "return_app", None) is not None:
                     self.return_at = time.time() + 0.7   # volta após 0,7 s sem toques
+
+    def bridge_loop(self):
+        """Verifica a ponte a cada 4 s (status mostrado na interface)."""
+        while True:
+            if self.cfg.get("use_bridge"):
+                r = bridge_call({"cmd": "status", "match": self.cfg.get("bridge_match")}, timeout=0.5)
+                if r is None:
+                    self.bridge.update(state="offline", devices=[])
+                else:
+                    devs = r.get("devices", [])
+                    ok = any(d.get("presets", 0) > 1 for d in devs)
+                    self.bridge.update(state="ativa" if ok else ("sem lista" if devs else "sem ANA"),
+                                       devices=devs)
+                self.bridge["checked"] = time.time()
+            time.sleep(4)
+
+    def try_bridge(self, direction):
+        if not self.cfg.get("use_bridge") or self.bridge["state"] not in ("ativa", "desconhecido"):
+            return False
+        r = bridge_call({"cmd": "step", "dir": direction, "match": self.cfg.get("bridge_match")})
+        if not r or not r.get("ok"):
+            if r is None:
+                self.bridge["state"] = "offline"
+            elif r.get("devices") is not None:
+                self.bridge["state"] = "sem lista"
+            return False
+        self.seq += 1
+        self.events.append({"seq": self.seq, "type": "preset", "name": r.get("name"),
+                            "index": r.get("index"), "total": r.get("total"),
+                            "port": "", "channel": 0, "number": 0, "value": 0})
+        return True
 
     def arrow(self, direction, win=None):
         win = win or find_window(self.cfg.get("window_match"))
@@ -602,6 +662,7 @@ class Engine:
             "log": LOG[-15:],
             "seq": self.seq,
             "acc": self.acc,
+            "bridge": {"state": self.bridge["state"], "devices": self.bridge["devices"]},
             "events": [e for e in list(self.events) if since is not None and e["seq"] > since][-60:],
         }
 
@@ -690,7 +751,7 @@ def main():
         webbrowser.open(f"http://{HOST}:{PORT}")
         return
     hub.scan()
-    for fn in (hub.loop, eng.midi_loop, eng.click_loop):
+    for fn in (hub.loop, eng.midi_loop, eng.click_loop, eng.bridge_loop):
         threading.Thread(target=fn, daemon=True).start()
     log(f"{APP_NAME} rodando. Interface: http://{HOST}:{PORT}")
     if "--open" in sys.argv:
