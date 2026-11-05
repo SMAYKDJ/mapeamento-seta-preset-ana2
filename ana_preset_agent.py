@@ -15,6 +15,8 @@ Requisitos: python-rtmidi, pyobjc-framework-Quartz (macOS).
 
 import json
 import queue
+from collections import deque
+from urllib.parse import urlparse, parse_qs
 import subprocess
 import sys
 import threading
@@ -281,6 +283,8 @@ class Engine:
         self.last_msg = None
         self.calib = {"state": "idle", "count": 0, "target": None}
         self.window_seen = None
+        self.events = deque(maxlen=300)   # para a interface acender os controles
+        self.seq = 0
 
     # ---------- entrada MIDI
     def midi_loop(self):
@@ -292,6 +296,9 @@ class Engine:
             t, ch, num, val = d
             self.last_msg = {"port": port, "type": t, "channel": ch, "number": num,
                              "value": val, "t": ts}
+            self.seq += 1
+            self.events.append({"seq": self.seq, "port": port, "type": t, "channel": ch,
+                                "number": num, "value": val})
             if self.learn:
                 self.handle_learn(port, t, ch, num, val, ts)
                 continue
@@ -426,9 +433,12 @@ class Engine:
         threading.Thread(target=run, daemon=True).start()
 
     # ---------- estado para a interface
-    def state(self):
+    def state(self, since=None):
         c = self.cfg.snapshot()
-        win = find_window(c["window_match"])
+        now = time.time()
+        if now - getattr(self, "_win_t", 0) > 1.0:      # não varre janelas a cada poll
+            self._win, self._win_t = bool(find_window(c["window_match"])), now
+        win = self._win
         lm = self.last_msg
         return {
             "ports": self.hub.ports(),
@@ -444,6 +454,8 @@ class Engine:
             "interval_ms": c["interval_ms"],
             "calib": self.calib,
             "log": LOG[-15:],
+            "seq": self.seq,
+            "events": [e for e in list(self.events) if since is not None and e["seq"] > since][-60:],
         }
 
 
@@ -464,10 +476,13 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        if self.path in ("/", "/index.html"):
+        u = urlparse(self.path)
+        if u.path in ("/", "/index.html"):
             return self._send(200, (HERE / "interface.html").read_bytes(), "text/html")
-        if self.path == "/api/state":
-            return self._send(200, self.engine.state())
+        if u.path == "/api/state":
+            q = parse_qs(u.query)
+            since = int(q["since"][0]) if q.get("since", [""])[0].lstrip("-").isdigit() else None
+            return self._send(200, self.engine.state(since))
         self._send(404, {"error": "não encontrado"})
 
     def do_POST(self):

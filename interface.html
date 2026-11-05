@@ -61,6 +61,44 @@
   .banner { border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 14px;
             background: color-mix(in srgb, var(--warn) 18%, var(--card)); border: 1px solid var(--warn); }
   .hidden { display: none; }
+  main { max-width: 900px; }
+  /* ---------- controlador */
+  .dev-wrap { overflow-x: auto; }
+  .dev { min-width: 640px; background: #1d1f24; border-radius: 12px; padding: 16px 16px 12px;
+         border-left: 6px solid #c8382c; border-right: 6px solid #c8382c; color: #cfd3da;
+         font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
+  .dev-top { display: grid; grid-template-columns: 1fr auto 0.78fr; gap: 14px; align-items: start; }
+  .pads { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; }
+  .pad { aspect-ratio: 1.25; border-radius: 4px; background: #474b55; position: relative;
+         transition: background .25s, box-shadow .25s; }
+  .trk { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; margin-top: 10px; }
+  .btn { height: 15px; border-radius: 3px; background: #5a5e68; position: relative;
+         transition: background .25s, box-shadow .25s; }
+  .btn.red { background: #9a3b3b; }
+  .lbl { display: block; text-align: center; margin-top: 3px; color: #8d929c; white-space: nowrap; }
+  .soft { display: grid; gap: 7px; padding-top: 2px; }
+  .soft .btn { width: 26px; height: 18px; }
+  .knobs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 10px; }
+  .knob { aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #3a3d44, #121316);
+          border: 2px solid #2a2c31; position: relative; transition: box-shadow .25s; }
+  .knob::after { content: ""; position: absolute; left: 50%; top: 6%; width: 3px; height: 30%;
+                 margin-left: -1.5px; background: #e7e9ee; border-radius: 2px;
+                 transform-origin: 50% 147%; transform: rotate(var(--a, 0deg)); transition: transform .12s; }
+  .trans { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 14px; }
+  .keys { display: flex; position: relative; height: 110px; margin-top: 16px; }
+  .wk { flex: 1; background: #f3f3f1; border: 1px solid #9b9b9b; border-radius: 0 0 4px 4px;
+        transition: background .2s; position: relative; }
+  .bk { position: absolute; top: 0; height: 62%; background: #1a1a1a; border-radius: 0 0 3px 3px;
+        z-index: 2; transition: background .2s; }
+  .hit { background: var(--accent) !important; box-shadow: 0 0 12px var(--accent); }
+  .knob.hit { background: radial-gradient(circle at 40% 35%, #3a3d44, #121316) !important; }
+  .b-prev { box-shadow: inset 0 0 0 3px #3b82f6; }
+  .b-next { box-shadow: inset 0 0 0 3px #22c55e; }
+  .knob.b-knob { box-shadow: 0 0 0 3px var(--accent); }
+  .badge { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px;
+           font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; pointer-events: none; }
+  .tag { display: inline-block; border-radius: 4px; padding: 0 5px; font-size: 12px; color: #fff; font-weight: 700; }
+  .t-prev { background: #3b82f6; } .t-next { background: #22c55e; } .t-knob { background: var(--accent); }
   @media (max-width: 560px) {
     .row { grid-template-columns: 1fr; gap: 6px; }
   }
@@ -81,6 +119,26 @@
   <section class="card">
     <h2>Status</h2>
     <div class="status" id="status"></div>
+  </section>
+
+  <section class="card">
+    <h2>Seu controlador</h2>
+    <p class="hint">Mexa em qualquer pad, knob, botão ou tecla: ele acende aqui. Controles mapeados aparecem marcados (<span class="tag t-prev">◀</span> <span class="tag t-next">▶</span> <span class="tag t-knob">knob</span>).</p>
+    <div class="dev-wrap"><div class="dev" id="dev">
+      <div class="dev-top">
+        <div class="dev-left">
+          <div class="pads" id="pads"></div>
+          <div class="trk" id="trk"></div>
+        </div>
+        <div class="soft" id="soft"></div>
+        <div class="dev-right">
+          <div class="knobs" id="knobs"></div>
+          <div class="trans" id="trans"></div>
+        </div>
+      </div>
+      <div class="keys" id="keys"></div>
+    </div></div>
+    <div class="monitor" id="devmon" style="margin-top:10px">—</div>
   </section>
 
   <section class="card">
@@ -160,11 +218,91 @@ function chip(ok, text) {
   return `<span class="chip"><span class="dot ${cls}"></span>${text}</span>`;
 }
 
+
+// ---------------- desenho do controlador (layout APC Key 25 mk2)
+let seq = -1;
+const knobAngle = {}, keyBase = { v: 48 };
+const el = (cls, id, label) => {
+  const d = document.createElement('div'); d.className = cls; if (id) d.id = id;
+  if (label !== undefined) { const w = document.createElement('div'); w.append(d);
+    const l = document.createElement('span'); l.className = 'lbl'; l.textContent = label; w.append(l); return w; }
+  return d;
+};
+(function buildDevice() {
+  for (let r = 4; r >= 0; r--) for (let c = 0; c < 8; c++) $('pads').append(el('pad', 'c-note-' + (r * 8 + c)));
+  ['▲','▼','◀','▶','Volume','Pan','Send','Device'].forEach((t, i) => $('trk').append(el('btn red', 'c-note-' + (64 + i), t)));
+  [['Clip Stop',82],['Solo',83],['Mute',84],['Rec Arm',85],['Select',86],['Stop All',81],['Shift',98]]
+    .forEach(([t, n]) => $('soft').append(el('btn', 'c-note-' + n, t)));
+  for (let i = 0; i < 8; i++) $('knobs').append(el('knob', 'c-cc-' + (48 + i), 'K' + (i + 1)));
+  [['Sustain','k-cc-64'],['Oct −',null],['Oct +',null],['▶/II','c-note-91'],['●','c-note-93']]
+    .forEach(([t, id]) => $('trans').append(el('btn', id, t)));
+  // 25 teclas: 15 brancas
+  const white = [0,2,4,5,7,9,11], blackPos = {1:0,3:1,6:3,8:4,10:5};
+  let wi = 0;
+  for (let n = 0; n <= 24; n++) {
+    const pc = n % 12, oct = Math.floor(n / 12);
+    if (white.includes(pc)) { $('keys').append(el('wk', 'key-' + n)); wi++; }
+  }
+  const W = 100 / 15;
+  for (let n = 0; n <= 24; n++) {
+    const pc = n % 12, oct = Math.floor(n / 12);
+    if (pc in blackPos) {
+      const b = el('bk', 'key-' + n);
+      const left = (oct * 7 + blackPos[pc] + 1) * W - W * 0.3;
+      b.style.left = left + '%'; b.style.width = (W * 0.6) + '%';
+      $('keys').append(b);
+    }
+  }
+})();
+
+function ctlId(e) {
+  const p = e.port.toLowerCase();
+  if (p.includes('control')) return (e.type === 'cc' ? 'c-cc-' : 'c-note-') + e.number;
+  if (p.includes('key')) {
+    if (e.type === 'cc') return 'k-cc-' + e.number;
+    let n = e.number;
+    if (n < keyBase.v || n > keyBase.v + 24) keyBase.v = n - (n % 12);
+    return 'key-' + (n - keyBase.v);
+  }
+  return null;
+}
+function onEvent(e) {
+  const name = (e.type === 'cc' ? 'CC ' : 'Nota ') + e.number + ' = ' + e.value + ' · canal ' + (e.channel + 1) + ' · ' + e.port;
+  $('devmon').textContent = name;
+  const id = ctlId(e), node = id && $(id);
+  if (!node) return;
+  if (node.classList.contains('knob')) {
+    const d = e.value < 64 ? e.value : e.value - 128;   // relativo
+    knobAngle[id] = ((knobAngle[id] || 0) + d * 6) % 360;
+    node.style.setProperty('--a', knobAngle[id] + 'deg');
+    flash(node, 300); return;
+  }
+  const isKey = node.classList.contains('wk') || node.classList.contains('bk');
+  if (isKey || id.startsWith('k-cc-')) { node.classList.toggle('hit', e.value > 0); return; }
+  if (e.value > 0) flash(node, 350);
+}
+function flash(node, ms) {
+  node.classList.add('hit'); clearTimeout(node._t);
+  node._t = setTimeout(() => node.classList.remove('hit'), ms);
+}
+function markBindings(b) {
+  document.querySelectorAll('.b-prev,.b-next,.b-knob').forEach(n => n.classList.remove('b-prev','b-next','b-knob'));
+  document.querySelectorAll('.badge').forEach(n => n.remove());
+  for (const [slot, cls, sym] of [['prev','b-prev','◀'],['next','b-next','▶'],['knob','b-knob','']]) {
+    const r = b[slot] && b[slot].raw; if (!r) continue;
+    const id = ctlId({ port: r.port, type: r.type, number: r.number }), node = id && $(id);
+    if (!node) continue;
+    node.classList.add(cls);
+    if (sym) { const g = document.createElement('div'); g.className = 'badge'; g.textContent = sym; node.append(g); }
+  }
+}
 async function tick() {
   let s;
-  try { s = await (await fetch('/api/state')).json(); $('offline').classList.add('hidden'); }
+  try { s = await (await fetch('/api/state?since=' + seq)).json(); $('offline').classList.add('hidden'); }
   catch (e) { $('offline').classList.remove('hidden'); return; }
 
+  if (seq < 0) seq = s.seq; else { s.events.forEach(onEvent); seq = s.seq; }
+  markBindings(s.bindings);
   const ports = s.ports.length ? s.ports.join(', ') : 'nenhum';
   $('status').innerHTML =
     chip(s.ports.length > 0, `MIDI: ${ports}`) +
@@ -199,7 +337,7 @@ async function tick() {
   $('log').textContent = s.log.join('\n');
 }
 tick();
-setInterval(tick, 400);
+setInterval(tick, 150);
 </script>
 </body>
 </html>
