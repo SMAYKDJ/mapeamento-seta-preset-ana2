@@ -51,7 +51,7 @@ DEFAULTS = {
     "channel": 0,                 # 0 = canal MIDI 1
     "cc": 48,                     # knob 1 da APC Key 25 (knobs: CC 48..55)
     "mode": "relative",           # APC Key 25 mk2: knobs relativos (1 = direita, 127 = esquerda)
-    "step": 6,                    # cliques do knob para avançar 1 preset (maior = menos sensível)
+    "step": 12,                   # cliques do knob para avançar 1 preset (maior = menos sensível)
     "interval_ms": 150,           # tempo mínimo entre cliques
     "max_pending": 2,             # máximo de cliques acumulados na fila
     "window_match": "ANA 2",      # trecho do título da janela do plugin
