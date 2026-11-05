@@ -96,6 +96,7 @@
         z-index: 2; transition: background .2s; }
   .hit { background: var(--accent) !important; box-shadow: 0 0 12px var(--accent); }
   .knob.hit { background: radial-gradient(circle at 40% 35%, #3a3d44, #121316) !important; }
+  .b-prev, .b-next { cursor: pointer; }
   .b-prev { box-shadow: inset 0 0 0 3px #3b82f6; }
   .b-next { box-shadow: inset 0 0 0 3px #22c55e; }
   .knob.b-knob { box-shadow: 0 0 0 3px var(--accent); }
@@ -127,7 +128,7 @@
 
   <section class="card">
     <h2>Seu controlador</h2>
-    <p class="hint">Mexa em qualquer pad, knob, botão ou tecla: ele acende aqui. Arraste para girar a vista 3D, role para aproximar. Controles mapeados aparecem marcados (<span class="tag t-prev">◀</span> <span class="tag t-next">▶</span> <span class="tag t-knob">knob</span>).</p>
+    <p class="hint">Mexa em qualquer pad, knob, botão ou tecla: ele acende aqui. Arraste para girar a vista 3D, role para aproximar. Clique nos pads ◀ ▶ do desenho para trocar o preset pelo navegador. Controles mapeados aparecem marcados (<span class="tag t-prev">◀</span> <span class="tag t-next">▶</span> <span class="tag t-knob">knob</span>).</p>
     <div id="dev3dhost" class="dev3d hidden"></div>
     <div class="dev-wrap" id="dev2d"><div class="dev" id="dev">
       <div class="dev-top">
@@ -300,6 +301,11 @@ function flash(node, ms) {
   node.classList.add('hit'); clearTimeout(node._t);
   node._t = setTimeout(() => node.classList.remove('hit'), ms);
 }
+window.addEventListener('virtual-arrow', e => post('/api/test', { dir: e.detail }));
+document.addEventListener('click', e => {           // desenho 2D: clicar nos pads ◀ ▶
+  const n = e.target.closest('.b-prev, .b-next');
+  if (n) { flash(n, 300); post('/api/test', { dir: n.classList.contains('b-prev') ? -1 : 1 }); }
+});
 function markBindings(b) {
   if (window.dev3d) {
     const map = {};

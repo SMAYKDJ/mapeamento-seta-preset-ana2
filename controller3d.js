@@ -148,6 +148,33 @@ window.dev3d = {
   },
 };
 
+// ---------- clique com o mouse nos controles mapeados (◀ ▶) troca o preset
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let downAt = null;
+function pick(ev) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(groups.map(g => g.mesh), false)[0];
+  if (!hit) return null;
+  const g = groups.find(x => x.mesh === hit.object);
+  return { g, i: hit.instanceId };
+}
+renderer.domElement.addEventListener('pointerdown', ev => { downAt = [ev.clientX, ev.clientY]; });
+renderer.domElement.addEventListener('pointerup', ev => {
+  if (!downAt || Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 5) return;  // foi arrasto
+  const p = pick(ev); if (!p) return;
+  const kind = p.g.bind[p.i];
+  if (kind === 'prev' || kind === 'next') {
+    p.g.glow[p.i] = 1;
+    window.dispatchEvent(new CustomEvent('virtual-arrow', { detail: kind === 'prev' ? -1 : 1 }));
+  }
+});
+renderer.domElement.addEventListener('pointermove', ev => {
+  const p = pick(ev); const k = p && p.g.bind[p.i];
+  renderer.domElement.style.cursor = (k === 'prev' || k === 'next') ? 'pointer' : '';
+});
+
 // ---------- loop
 function resize() {
   const w = host.clientWidth, h = Math.round(w * 0.6);
