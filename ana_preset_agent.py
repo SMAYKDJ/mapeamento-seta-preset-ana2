@@ -45,6 +45,8 @@ DEFAULTS = {
     "interval_ms": 150,      # tempo mínimo entre cliques nas setas
     "max_pending": 2,
     "restore_mouse": True,
+    "auto_focus_live": True,  # traz o Ableton para frente se a janela do ANA estiver oculta
+    "return_focus": True,     # depois do clique, volta para o app em que você estava
     "ref_width": 1054.0,
     "prev": [517.0, 55.8],
     "next": [536.5, 55.8],
@@ -154,6 +156,11 @@ def live_windows():
 
 
 try:
+    import AppKit
+except ImportError:
+    AppKit = None
+
+try:
     import ApplicationServices as AS
 except ImportError:
     AS = None
@@ -236,6 +243,33 @@ def find_window(match):
             return x, y, w, h
     _DIAG["method"] = None
     return None
+
+
+def frontmost_app():
+    if AppKit is None:
+        return None
+    try:
+        return AppKit.NSWorkspace.sharedWorkspace().frontmostApplication()
+    except Exception:
+        return None
+
+
+def live_app():
+    if AppKit is None:
+        return None
+    for app in AppKit.NSWorkspace.sharedWorkspace().runningApplications():
+        bid = app.bundleIdentifier() or ""
+        if bid.startswith("com.ableton.live"):
+            return app
+    return None
+
+
+def activate(app):
+    try:
+        app.activateWithOptions_(AppKit.NSApplicationActivateIgnoringOtherApps)
+        return True
+    except Exception:
+        return False
 
 
 def mouse_pos():
@@ -456,22 +490,55 @@ class Engine:
             with self.lock:
                 p = self.pending
             if not p:
+                ra = getattr(self, "return_app", None)
+                if ra is not None and time.time() > self.return_at:
+                    self.return_app = None
+                    activate(ra)
                 time.sleep(0.005)
                 continue
-            direction = 1 if p > 0 else -1
             win = find_window(self.cfg.get("window_match"))
+            back_to = None
+            if not win and self.cfg.get("auto_focus_live"):
+                # O Live esconde janelas de plugin quando não está na frente:
+                # traz o Ableton, espera a janela do ANA reaparecer, clica e volta.
+                live, front = live_app(), frontmost_app()
+                if live is not None and activate(live):
+                    if front is not None and front.bundleIdentifier() != live.bundleIdentifier():
+                        back_to = front
+                    for _ in range(25):
+                        time.sleep(0.04)
+                        _ax_cache["t"] = 0
+                        win = find_window(self.cfg.get("window_match"))
+                        if win:
+                            time.sleep(0.06)
+                            break
             if not win:
                 if not warned:
-                    log("Janela do ANA 2 não está visível — abra o plugin no Ableton.")
+                    log("Janela do ANA 2 não está aberta — clique na chave inglesa do device no Ableton.")
                     warned = True
                 with self.lock:
                     self.pending = 0
+                if back_to is not None:
+                    activate(back_to)
                 continue
             warned = False
-            self.arrow(direction, win)
-            with self.lock:
-                self.pending -= direction
-            time.sleep(self.cfg.get("interval_ms") / 1000.0)
+            # executa tudo o que estiver na fila enquanto o Ableton está na frente
+            while True:
+                with self.lock:
+                    p = self.pending
+                if not p:
+                    break
+                direction = 1 if p > 0 else -1
+                self.arrow(direction, win)
+                with self.lock:
+                    self.pending -= direction
+                time.sleep(self.cfg.get("interval_ms") / 1000.0)
+                win = find_window(self.cfg.get("window_match")) or win
+            if self.cfg.get("return_focus"):
+                if back_to is not None and getattr(self, "return_app", None) is None:
+                    self.return_app = back_to
+                if getattr(self, "return_app", None) is not None:
+                    self.return_at = time.time() + 0.7   # volta após 0,7 s sem toques
 
     def arrow(self, direction, win=None):
         win = win or find_window(self.cfg.get("window_match"))

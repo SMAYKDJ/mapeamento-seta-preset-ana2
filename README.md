@@ -31,7 +31,7 @@ Requer Python 3 (`brew install python` ou python.org).
 
 1. No Ableton, abra a janela do ANA 2 (chave inglesa no device).
 2. Na interface, clique em **Aprender** ao lado de *Knob*, *◀ Anterior* ou *▶ Próximo* e mexa no controle.
-3. Use com o Ableton na frente: o Live esconde janelas de plugin quando outro app está ativo.
+3. Pode estar em qualquer app: se a janela do ANA estiver oculta, o agente traz o Ableton para frente, troca o preset e volta para onde você estava. A janela do plugin só precisa estar aberta (chave inglesa).
 
 Se o seu controlador também comanda o Ableton (Control Surface), escolha um controle que não esteja mapeado lá.
 
