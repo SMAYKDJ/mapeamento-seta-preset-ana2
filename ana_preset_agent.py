@@ -153,16 +153,88 @@ def live_windows():
     return rows
 
 
-def find_window(match):
+try:
+    import ApplicationServices as AS
+except ImportError:
+    AS = None
+
+_DIAG = {"method": None, "live_windows": []}
+
+
+def _live_quartz():
+    """Janelas do Ableton (dono 'Live') visíveis na tela, via Quartz.
+    Nomes só aparecem com Gravação de Tela; dono, PID e tamanho sempre."""
     opts = (Quartz.kCGWindowListOptionOnScreenOnly
             | Quartz.kCGWindowListExcludeDesktopElements)
+    out = []
     for w in Quartz.CGWindowListCopyWindowInfo(opts, Quartz.kCGNullWindowID) or []:
-        if match in (w.get("kCGWindowName") or ""):
+        if (w.get("kCGWindowOwnerName") or "").startswith("Live") and w.get("kCGWindowLayer", 0) == 0:
             b = w["kCGWindowBounds"]
-            return float(b["X"]), float(b["Y"]), float(b["Width"]), float(b["Height"])
+            out.append((w.get("kCGWindowName") or "", int(w.get("kCGWindowOwnerPID", 0)),
+                        float(b["X"]), float(b["Y"]), float(b["Width"]), float(b["Height"])))
+    return out
+
+
+def _ax_windows(pid):
+    """Títulos e posições pela API de Acessibilidade (sem System Events)."""
+    if AS is None or not pid:
+        return []
+    rows = []
+    try:
+        app = AS.AXUIElementCreateApplication(pid)
+        err, wins = AS.AXUIElementCopyAttributeValue(app, AS.kAXWindowsAttribute, None)
+        for win in (wins or []) if err == 0 else []:
+            _, title = AS.AXUIElementCopyAttributeValue(win, AS.kAXTitleAttribute, None)
+            _, pos = AS.AXUIElementCopyAttributeValue(win, AS.kAXPositionAttribute, None)
+            _, size = AS.AXUIElementCopyAttributeValue(win, AS.kAXSizeAttribute, None)
+            ok1, p = AS.AXValueGetValue(pos, AS.kAXValueCGPointType, None)
+            ok2, sz = AS.AXValueGetValue(size, AS.kAXValueCGSizeType, None)
+            if ok1 and ok2:
+                rows.append((str(title or ""), p.x, p.y, sz.width, sz.height))
+    except Exception as e:
+        _DIAG["ax_exception"] = str(e)[:200]
+    return rows
+
+
+def find_window(match):
+    q = _live_quartz()
+    # 1) Quartz com nome (precisa de Gravação de Tela)
+    for name, _pid, x, y, w, h in q:
+        if match in name:
+            _DIAG.update(method="quartz", live_windows=[r[0] for r in q])
+            return x, y, w, h
+    # 2) Acessibilidade nativa (precisa só de Acessibilidade)
+    pids = {r[1] for r in q}
+    if not pids:
+        try:
+            out = subprocess.run(["pgrep", "-x", "Live"], capture_output=True, text=True).stdout
+            pids = {int(p) for p in out.split()}
+        except Exception:
+            pass
+    for pid in pids:
+        rows = _ax_windows(pid)
+        if rows:
+            _DIAG["live_windows"] = [r[0] for r in rows]
+        for name, x, y, w, h in rows:
+            if match in name:
+                _DIAG["method"] = "acessibilidade"
+                return x, y, w, h
+    # 3) System Events (osascript)
     for name, x, y, w, h in live_windows():
         if match in name:
+            _DIAG["method"] = "system events"
             return x, y, w, h
+    # 4) Sem nomes: janela do Live que não é a principal e tem a proporção do ANA
+    if q and not any(r[0] for r in q):
+        main = max(q, key=lambda r: r[4] * r[5])
+        ref = 1054.0 / 804.0
+        cands = [r for r in q if r is not main and 500 < r[4] < 2400
+                 and abs(r[4] / max(r[5], 1) - ref) < 0.12]
+        if len(cands) == 1:
+            _DIAG["method"] = "tamanho"
+            _, _, x, y, w, h = cands[0]
+            return x, y, w, h
+    _DIAG["method"] = None
     return None
 
 
@@ -447,7 +519,9 @@ class Engine:
             "last": (f"{'CC' if lm['type'] == 'cc' else 'Nota'} {lm['number']} = {lm['value']} "
                      f"(canal {lm['channel'] + 1}) · {lm['port']}") if lm and time.time() - lm["t"] < 5 else None,
             "window": bool(win),
-            "windows": [r[0] for r in _ax_cache["rows"]],
+            "windows": _DIAG.get("live_windows") or [r[0] for r in _ax_cache["rows"]],
+            "find_method": _DIAG.get("method"),
+            "ax_exception": _DIAG.get("ax_exception"),
             "ax_error": _ax_cache["error"],
             "can_click": can_click(),
             "step": c["step"],

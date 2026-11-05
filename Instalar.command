@@ -22,7 +22,7 @@ if [ ! -x "$APP/venv/bin/python" ]; then
 fi
 echo "Instalando dependências..."
 "$APP/venv/bin/pip" install -q --upgrade pip
-"$APP/venv/bin/pip" install -q python-rtmidi pyobjc-framework-Quartz
+"$APP/venv/bin/pip" install -q python-rtmidi pyobjc-framework-Quartz pyobjc-framework-ApplicationServices
 
 cat > "$PLIST" <<PL
 <?xml version="1.0" encoding="UTF-8"?>
